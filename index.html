@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel Nadgodzin</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #1d2939;
+      --muted: #667085;
+      --primary: #2563eb;
+      --primary-dark: #1e40af;
+      --success: #12b76a;
+      --warning: #f79009;
+      --danger: #f04438;
+      --border: #e4e7ec;
+      --shadow: 0 8px 24px rgba(16,24,40,.08);
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .app { min-height: 100vh; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 12px; padding: 14px 18px; background: #fff; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 5;
+    }
+    .brand { font-weight: 700; }
+    .small { color: var(--muted); font-size: 12px; }
+    .layout { display: grid; grid-template-columns: 230px 1fr; min-height: calc(100vh - 62px); }
+    .sidebar { background: #fff; border-right: 1px solid var(--border); padding: 12px; }
+    .menu-btn {
+      width: 100%; text-align: left; padding: 10px 12px; border: 1px solid var(--border);
+      border-radius: 10px; background: #fff; margin-bottom: 8px; cursor: pointer;
+    }
+    .menu-btn.active { background: #eff4ff; border-color: #bfd2ff; color: var(--primary-dark); font-weight: 600; }
+    .content { padding: 16px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 14px;
+    }
+    .grid { display: grid; gap: 12px; }
+    .grid-4 { grid-template-columns: repeat(4,minmax(0,1fr)); }
+    .grid-3 { grid-template-columns: repeat(3,minmax(0,1fr)); }
+    .stats .card { padding: 12px; }
+    .stat-value { font-size: 26px; font-weight: 700; }
+    .label { font-size: 13px; color: var(--muted); }
+    .form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    input, select, textarea, button {
+      font: inherit;
+    }
+    input, select, textarea {
+      width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; background: #fff;
+    }
+    textarea { min-height: 84px; resize: vertical; }
+    button.primary, .primary {
+      border: 0; background: var(--primary); color: #fff; padding: 10px 14px; border-radius: 10px; cursor: pointer;
+    }
+    button.secondary { border: 1px solid var(--border); background: #fff; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+    button.danger { border: 0; background: var(--danger); color: #fff; border-radius: 10px; padding: 9px 12px; cursor: pointer; }
+    button.success { border: 0; background: var(--success); color: #fff; border-radius: 10px; padding: 9px 12px; cursor: pointer; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+    .slot-list, .cards { display: grid; gap: 10px; }
+    .slot {
+      border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: #fff;
+      display: grid; gap: 8px;
+    }
+    .slot-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .badge { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .free { background: #ecfdf3; color: #027a48; }
+    .taken { background: #fef3f2; color: #b42318; }
+    .muted { color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid var(--border); padding: 8px; text-align: left; font-size: 14px; }
+    .login-wrap { min-height: 100vh; display:flex; align-items:center; justify-content:center; padding: 16px; }
+    .login-card { width: min(460px,100%); }
+    .msg { margin-top: 8px; font-size: 14px; }
+    .msg.ok { color: #067647; }
+    .msg.err { color: #b42318; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display: flex; gap: 6px; overflow-x: auto; padding: 8px; }
+      .menu-btn { min-width: 150px; margin: 0; }
+      .grid-4, .grid-3, .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div id="app" class="app"></div>
+<script>
+(() => {
+  const STORAGE_KEYS = {
+    users: 'users', departments: 'departments', machines: 'machines', overtimeSlots: 'overtimeSlots', currentUser: 'currentUser'
+  };
+  const defaultData = {
+    users: [
+      {id:'u_admin', login:'admin', password:'admin', role:'admin', fullName:'Administrator'},
+      {id:'u_koordA', login:'koordA', password:'1234', role:'coordinator', shift:'A', fullName:'Koordynator A'},
+      {id:'u_koordB', login:'koordB', password:'1234', role:'coordinator', shift:'B', fullName:'Koordynator B'},
+      {id:'u_koordC', login:'koordC', password:'1234', role:'coordinator', shift:'C', fullName:'Koordynator C'},
+      {id:'u_koordD', login:'koordD', password:'1234', role:'coordinator', shift:'D', fullName:'Koordynator D'},
+      {id:'u_prac1', login:'prac1', password:'1234', role:'employee', fullName:'Jan Kowalski'},
+      {id:'u_prac2', login:'prac2', password:'1234', role:'employee', fullName:'Anna Nowak'},
+      {id:'u_prac3', login:'prac3', password:'1234', role:'employee', fullName:'Piotr Zieliński'}
+    ],
+    departments: ['Produkcja','Pakownia','Magazyn'],
+    machines: {
+      'Produkcja': ['BW5','BW4','AQ Flex','GIMA'],
+      'Pakownia': ['Linia 1','Linia 2'],
+      'Magazyn': ['Wózek','Załadunek']
+    },
+    overtimeSlots: []
+  };
+
+  const state = { view: 'dashboard', message: '' };
+  const app = document.getElementById('app');
+  const get = (k, fallback) => JSON.parse(localStorage.getItem(k) || JSON.stringify(fallback));
+  const set = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+  const nowIso = () => new Date().toISOString();
+  const uid = (prefix='id') => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+
+  function initData(force = false) {
+    if (force || !localStorage.getItem(STORAGE_KEYS.users)) {
+      set(STORAGE_KEYS.users, defaultData.users);
+      set(STORAGE_KEYS.departments, defaultData.departments);
+      set(STORAGE_KEYS.machines, defaultData.machines);
+      set(STORAGE_KEYS.overtimeSlots, defaultData.overtimeSlots);
+      localStorage.removeItem(STORAGE_KEYS.currentUser);
+    }
+  }
+  initData();
+
+  function currentUser() { return get(STORAGE_KEYS.currentUser, null); }
+  function requireAuth() { if (!currentUser()) { renderLogin(); return false; } return true; }
+  const esc = (s='') => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+
+  function toast(msg, ok=true) { state.message = `<div class="msg ${ok?'ok':'err'}">${esc(msg)}</div>`; }
+
+  function renderLogin() {
+    app.innerHTML = `<div class="login-wrap"><div class="card login-card">
+      <h2>Logowanie</h2><p class="small">Panel zarządzania nadgodzinami</p>
+      <form id="loginForm" class="grid">
+        <div class="form-group"><label>Login</label><input name="login" required></div>
+        <div class="form-group"><label>Hasło</label><input name="password" type="password" required></div>
+        <button class="primary" type="submit">Zaloguj</button>
+      </form>
+      <div class="small">Konto testowe: admin / admin</div>
+      ${state.message || ''}
+    </div></div>`;
+    document.getElementById('loginForm').onsubmit = (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const users = get(STORAGE_KEYS.users, []);
+      const user = users.find(u => u.login === fd.get('login') && u.password === fd.get('password'));
+      if (!user) { toast('Błędny login lub hasło.', false); return renderLogin(); }
+      set(STORAGE_KEYS.currentUser, user);
+      state.view = 'dashboard';
+      state.message = '';
+      renderApp();
+    };
+  }
+
+  function layout(user, menuHtml, contentHtml) {
+    app.innerHTML = `<div class="topbar"><div><div class="brand">Nadgodziny • ${esc(user.fullName)}</div>
+      <div class="small">Rola: ${esc(user.role)} ${user.shift ? `| Zmiana: ${esc(user.shift)}` : ''}</div></div>
+      <button class="secondary" id="logoutBtn">Wyloguj</button></div>
+      <div class="layout"><aside class="sidebar">${menuHtml}</aside><main class="content">${state.message || ''}${contentHtml}</main></div>`;
+    document.getElementById('logoutBtn').onclick = () => { localStorage.removeItem(STORAGE_KEYS.currentUser); state.message=''; renderLogin(); };
+  }
+
+  function renderApp() {
+    if (!requireAuth()) return;
+    const user = currentUser();
+    if (user.role === 'admin') return renderAdmin(user);
+    if (user.role === 'coordinator') return renderCoordinator(user);
+    return renderEmployee(user);
+  }
+
+  function renderAdmin(user) {
+    const slots = get(STORAGE_KEYS.overtimeSlots, []), users = get(STORAGE_KEYS.users, []), departments = get(STORAGE_KEYS.departments, []), machines = get(STORAGE_KEYS.machines, {});
+    const menu = `<button class="menu-btn ${state.view==='dashboard'?'active':''}" data-v="dashboard">Dashboard</button>
+      <button class="menu-btn ${state.view==='slots'?'active':''}" data-v="slots">Wszystkie miejsca</button>
+      <button class="menu-btn ${state.view==='settings'?'active':''}" data-v="settings">Ustawienia</button>
+      <button class="menu-btn ${state.view==='users'?'active':''}" data-v="users">Użytkownicy</button>`;
+    let content = '';
+    if (state.view === 'dashboard') {
+      content = `<div class="grid grid-4 stats">
+        <div class="card"><div class="label">Wolne miejsca</div><div class="stat-value">${slots.filter(s=>s.status==='free').length}</div></div>
+        <div class="card"><div class="label">Zajęte miejsca</div><div class="stat-value">${slots.filter(s=>s.status==='taken').length}</div></div>
+        <div class="card"><div class="label">Użytkownicy</div><div class="stat-value">${users.length}</div></div>
+        <div class="card"><div class="label">Działy</div><div class="stat-value">${departments.length}</div></div>
+      </div>`;
+    } else if (state.view === 'settings') {
+      content = `<div class="grid grid-3"><div class="card"><h3>Działy</h3>
+        <form id="addDeptForm" class="toolbar"><input name="name" placeholder="Nowy dział" required><button class="primary">Dodaj</button></form>
+        ${departments.map(d=>`<div class="toolbar"><strong>${esc(d)}</strong><button class="danger" data-del-dept="${esc(d)}">Usuń</button></div>`).join('') || '<div class="small">Brak działów</div>'}
+      </div><div class="card" style="grid-column: span 2;"><h3>Maszyny</h3>
+      <form id="addMachineForm" class="toolbar"><select name="department" required>${departments.map(d=>`<option>${esc(d)}</option>`)}</select><input name="machine" placeholder="Nazwa maszyny" required><button class="primary">Dodaj maszynę</button></form>
+      ${departments.map(d=>`<div class="slot"><strong>${esc(d)}</strong><div class="toolbar">${(machines[d]||[]).map(m=>`<span class="badge free">${esc(m)} <button class="danger" data-del-machine="${esc(d)}|${esc(m)}">x</button></span>`).join(' ') || '<span class="small">Brak maszyn</span>'}</div></div>`).join('')}
+      <button class="danger" id="resetDataBtn">Reset danych testowych</button>
+      </div></div>`;
+    } else if (state.view === 'users') {
+      content = `<div class="card"><h3>Zarządzanie użytkownikami</h3>
+      <form id="userForm" class="form-grid">
+      <div class="form-group"><label>Login</label><input name="login" required></div>
+      <div class="form-group"><label>Hasło</label><input name="password" required></div>
+      <div class="form-group"><label>Imię i nazwisko</label><input name="fullName" required></div>
+      <div class="form-group"><label>Rola</label><select name="role" id="roleSel"><option value="employee">Pracownik</option><option value="coordinator">Koordynator/TL</option><option value="admin">Administrator</option></select></div>
+      <div class="form-group"><label>Zmiana (A/B/C/D dla koordynatora)</label><input name="shift"></div>
+      <div class="form-group"><label>&nbsp;</label><button class="primary">Dodaj użytkownika</button></div>
+      </form>
+      <table><thead><tr><th>Login</th><th>Nazwa</th><th>Rola</th><th>Zmiana</th><th>Akcja</th></tr></thead><tbody>
+      ${users.map(u=>`<tr><td>${esc(u.login)}</td><td><input value="${esc(u.fullName)}" data-edit-name="${u.id}"></td><td>${esc(u.role)}</td><td>${esc(u.shift||'-')}</td><td><button class="secondary" data-save-user="${u.id}">Zapisz</button> <button class="danger" data-del-user="${u.id}">Usuń</button></td></tr>`).join('')}
+      </tbody></table></div>`;
+    } else {
+      content = adminSlotsView(slots, departments, machines);
+    }
+    layout(user, menu, content);
+    document.querySelectorAll('.menu-btn').forEach(b => b.onclick = () => { state.view = b.dataset.v; state.message=''; renderAdmin(user); });
+    bindAdminHandlers();
+  }
+
+  function adminSlotsView(slots, departments, machines) {
+    const rows = slots.map(s => `<tr><td>${esc(s.date)}</td><td>${esc(s.startTime)}-${esc(s.endTime)}</td><td>${esc(s.department)}</td><td>${esc(s.machine)}</td><td>${esc(s.shift||'-')}</td><td><span class="badge ${s.status==='free'?'free':'taken'}">${s.status==='free'?'wolne':'zajęte'}</span></td><td>${esc(s.createdByName)}</td><td>${esc(s.takenByName||'-')}</td></tr>`).join('');
+    return `<div class="card"><h3>Wszystkie miejsca</h3>
+      <div class="toolbar"><input id="fDate" type="date"><select id="fDept"><option value="">Dział</option>${departments.map(d=>`<option>${esc(d)}</option>`)}</select>
+      <select id="fMachine"><option value="">Maszyna</option>${Object.values(machines).flat().map(m=>`<option>${esc(m)}</option>`)}</select>
+      <select id="fStatus"><option value="">Status</option><option value="free">wolne</option><option value="taken">zajęte</option></select>
+      <select id="fShift"><option value="">Zmiana</option><option>A</option><option>B</option><option>C</option><option>D</option></select><button class="secondary" id="applyFilter">Filtruj</button></div>
+      <table><thead><tr><th>Data</th><th>Godziny</th><th>Dział</th><th>Maszyna</th><th>Zmiana</th><th>Status</th><th>Dodał</th><th>Zajął</th></tr></thead><tbody id="slotsTableBody">${rows || '<tr><td colspan="8">Brak danych</td></tr>'}</tbody></table>
+    </div>`;
+  }
+
+  function bindAdminHandlers() {
+    const de = get(STORAGE_KEYS.departments, []), mach = get(STORAGE_KEYS.machines, {});
+    const addDeptForm = document.getElementById('addDeptForm');
+    if (addDeptForm) addDeptForm.onsubmit = (e) => { e.preventDefault(); const n = e.target.name.value.trim(); if(!n) return; if(de.includes(n)) return toast('Taki dział już istnieje', false), renderApp(); de.push(n); mach[n]=[]; set(STORAGE_KEYS.departments,de); set(STORAGE_KEYS.machines,mach); toast('Dodano dział'); renderApp(); };
+    document.querySelectorAll('[data-del-dept]').forEach(b => b.onclick = () => { const d=b.dataset.delDept; const arr=de.filter(x=>x!==d); delete mach[d]; set(STORAGE_KEYS.departments,arr); set(STORAGE_KEYS.machines,mach); toast('Usunięto dział'); renderApp(); });
+    const addMachineForm = document.getElementById('addMachineForm');
+    if (addMachineForm) addMachineForm.onsubmit = (e) => { e.preventDefault(); const d=e.target.department.value,m=e.target.machine.value.trim(); if(!m) return; mach[d]=mach[d]||[]; if(mach[d].includes(m)) return toast('Maszyna już istnieje', false), renderApp(); mach[d].push(m); set(STORAGE_KEYS.machines,mach); toast('Dodano maszynę'); renderApp(); };
+    document.querySelectorAll('[data-del-machine]').forEach(b => b.onclick = () => { const [d,m]=b.dataset.delMachine.split('|'); mach[d]=(mach[d]||[]).filter(x=>x!==m); set(STORAGE_KEYS.machines,mach); toast('Usunięto maszynę'); renderApp(); });
+    const resetBtn = document.getElementById('resetDataBtn');
+    if (resetBtn) resetBtn.onclick = () => { initData(true); toast('Zresetowano dane testowe'); renderApp(); };
+    const userForm = document.getElementById('userForm');
+    if (userForm) userForm.onsubmit = (e) => { e.preventDefault(); const fd = new FormData(e.target); const users=get(STORAGE_KEYS.users,[]); const login=fd.get('login').trim(); if(users.some(u=>u.login===login)) return toast('Login zajęty',false), renderApp(); const role=fd.get('role'); const shift=(fd.get('shift')||'').trim().toUpperCase(); if(role==='coordinator' && !['A','B','C','D'].includes(shift)) return toast('Koordynator musi mieć zmianę A/B/C/D',false), renderApp(); users.push({id:uid('u'),login,password:fd.get('password'),fullName:fd.get('fullName'),role,shift:role==='coordinator'?shift:''}); set(STORAGE_KEYS.users,users); toast('Dodano użytkownika'); renderApp(); };
+    document.querySelectorAll('[data-del-user]').forEach(b => b.onclick = () => { const id=b.dataset.delUser; let users=get(STORAGE_KEYS.users,[]); users=users.filter(u=>u.id!==id); set(STORAGE_KEYS.users,users); toast('Usunięto użytkownika'); renderApp(); });
+    document.querySelectorAll('[data-save-user]').forEach(b => b.onclick = () => { const id=b.dataset.saveUser; const users=get(STORAGE_KEYS.users,[]); const inp=document.querySelector(`[data-edit-name="${id}"]`); const u=users.find(x=>x.id===id); if(u&&inp){u.fullName=inp.value.trim()||u.fullName; set(STORAGE_KEYS.users,users); toast('Zapisano użytkownika'); renderApp();}});
+    const apply = document.getElementById('applyFilter');
+    if (apply) apply.onclick = () => { const all=get(STORAGE_KEYS.overtimeSlots,[]); const f={date:document.getElementById('fDate').value,dept:document.getElementById('fDept').value,machine:document.getElementById('fMachine').value,status:document.getElementById('fStatus').value,shift:document.getElementById('fShift').value}; const filt=all.filter(s=>(!f.date||s.date===f.date)&&(!f.dept||s.department===f.dept)&&(!f.machine||s.machine===f.machine)&&(!f.status||s.status===f.status)&&(!f.shift||s.shift===f.shift)); document.getElementById('slotsTableBody').innerHTML=filt.map(s=>`<tr><td>${esc(s.date)}</td><td>${esc(s.startTime)}-${esc(s.endTime)}</td><td>${esc(s.department)}</td><td>${esc(s.machine)}</td><td>${esc(s.shift||'-')}</td><td><span class="badge ${s.status==='free'?'free':'taken'}">${s.status==='free'?'wolne':'zajęte'}</span></td><td>${esc(s.createdByName)}</td><td>${esc(s.takenByName||'-')}</td></tr>`).join('') || '<tr><td colspan="8">Brak wyników</td></tr>'; };
+  }
+
+  function renderCoordinator(user) {
+    const departments=get(STORAGE_KEYS.departments,[]), machines=get(STORAGE_KEYS.machines,{}), slots=get(STORAGE_KEYS.overtimeSlots,[]).filter(s=>s.createdBy===user.id);
+    const menu = `<button class="menu-btn active">Moje miejsca</button>`;
+    const deptOpts = departments.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join('');
+    const content = `<div class="card"><h3>Dodaj wolne miejsce</h3>
+      <form id="coordForm" class="form-grid">
+        <div class="form-group"><label>Data</label><input type="date" name="date" required></div>
+        <div class="form-group"><label>Liczba miejsc</label><input type="number" name="count" min="1" value="1" required></div>
+        <div class="form-group"><label>Godzina od</label><input type="time" name="startTime" required></div>
+        <div class="form-group"><label>Godzina do</label><input type="time" name="endTime" required></div>
+        <div class="form-group"><label>Dział</label><select name="department" id="coordDepartment" required>${deptOpts}</select></div>
+        <div class="form-group"><label>Maszyna</label><select name="machine" id="coordMachine" required></select></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Uwagi</label><textarea name="notes" placeholder="Opcjonalnie"></textarea></div>
+        <div><button class="primary">Dodaj miejsca</button></div>
+      </form></div>
+      <div class="card" style="margin-top:12px;"><h3>Moje dodane miejsca</h3><div class="slot-list">${slots.map(s=>slotCard(s,true)).join('') || '<div class="small">Brak dodanych miejsc.</div>'}</div></div>`;
+    layout(user, menu, content);
+    const depSel=document.getElementById('coordDepartment'), machSel=document.getElementById('coordMachine');
+    const fillMachines = () => { const arr=machines[depSel.value]||[]; machSel.innerHTML=arr.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join(''); };
+    fillMachines(); depSel.onchange=fillMachines;
+    document.getElementById('coordForm').onsubmit = (e)=>{ e.preventDefault(); const fd=new FormData(e.target); const count=Number(fd.get('count')); if(count<1||count>100) return toast('Liczba miejsc 1-100',false), renderApp(); if(fd.get('endTime')<=fd.get('startTime')) return toast('Godzina zakończenia musi być późniejsza',false), renderApp(); const all=get(STORAGE_KEYS.overtimeSlots,[]); for(let i=0;i<count;i++){ all.push({id:uid('slot'),date:fd.get('date'),startTime:fd.get('startTime'),endTime:fd.get('endTime'),department:fd.get('department'),machine:fd.get('machine'),shift:user.shift||'',notes:fd.get('notes')||'',status:'free',createdBy:user.id,createdByName:user.fullName,takenBy:'',takenByName:'',createdAt:nowIso(),takenAt:''}); } set(STORAGE_KEYS.overtimeSlots,all); toast(`Dodano ${count} miejsc.`); renderApp(); };
+  }
+
+  function slotCard(s, withOwner=false) {
+    return `<div class="slot"><div class="slot-head"><strong>${esc(s.date)} • ${esc(s.startTime)}-${esc(s.endTime)}</strong><span class="badge ${s.status==='free'?'free':'taken'}">${s.status==='free'?'wolne':'zajęte'}</span></div>
+      <div>${esc(s.department)} / ${esc(s.machine)} | Zmiana: ${esc(s.shift||'-')}</div>
+      <div class="muted">Uwagi: ${esc(s.notes||'-')}</div>
+      ${withOwner ? `<div class="small">Dodał: ${esc(s.createdByName)} | Zajął: ${esc(s.takenByName||'-')}</div>` : ''}
+      ${s.takenAt ? `<div class="small">Zajęte: ${new Date(s.takenAt).toLocaleString('pl-PL')}</div>` : ''}
+    </div>`;
+  }
+
+  function renderEmployee(user) {
+    const all=get(STORAGE_KEYS.overtimeSlots,[]);
+    const free=all.filter(s=>s.status==='free');
+    const mine=all.filter(s=>s.takenBy===user.id);
+    const menu = `<button class="menu-btn active">Nadgodziny</button>`;
+    const content = `<div class="card"><h3>Dostępne wolne miejsca</h3><div class="cards">${free.map(s=>`${slotCard(s,false)}<button class="success" data-take="${s.id}">Biorę nadgodziny</button>`).join('') || '<div class="small">Brak wolnych miejsc.</div>'}</div></div>
+      <div class="card" style="margin-top:12px;"><h3>Moje nadgodziny</h3><div class="cards">${mine.map(s=>slotCard(s,true)).join('') || '<div class="small">Jeszcze nic nie zajęto.</div>'}</div></div>`;
+    layout(user, menu, content);
+    document.querySelectorAll('[data-take]').forEach(b => b.onclick = () => {
+      const id=b.dataset.take;
+      const slots=get(STORAGE_KEYS.overtimeSlots,[]);
+      const slot=slots.find(s=>s.id===id);
+      if(!slot) return toast('Miejsce nie istnieje.',false), renderApp();
+      if(slot.status!=='free') return toast('To miejsce zostało już zajęte.',false), renderApp();
+      slot.status='taken'; slot.takenBy=user.id; slot.takenByName=user.fullName; slot.takenAt=nowIso();
+      set(STORAGE_KEYS.overtimeSlots,slots);
+      toast('Nadgodziny zostały przypisane do Ciebie.');
+      renderApp();
+    });
+  }
+
+  renderApp();
+})();
+</script>
+</body>
+</html>
